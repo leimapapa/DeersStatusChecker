@@ -32,6 +32,7 @@
     }
     .up { color: green; }
     .down { color: red; }
+    .mixed { color: orange; }
     .timestamp {
       font-size: 0.9rem;
       color: #666;
@@ -58,25 +59,46 @@
   <button onclick="checkStatus()">Check Again</button>
 
   <script>
+    async function checkMultipleUrls(urls) {
+      const results = await Promise.all(urls.map(url => 
+        fetch(url, { mode: 'no-cors' })
+          .then(() => ({ url, status: 'up' }))
+          .catch(() => ({ url, status: 'down' }))
+      ));
+      return results;
+    }
+
+    function interpretStatus(results) {
+      const upCount = results.filter(r => r.status === 'up').length;
+      const downCount = results.length - upCount;
+
+      if (upCount === results.length) return { status: 'UP ✅', class: 'up' };
+      if (downCount === results.length) return { status: 'DOWN ❌', class: 'down' };
+      return { status: 'PARTIALLY UP ⚠️', class: 'mixed' };
+    }
+
     async function checkStatus() {
       const statusEl = document.getElementById('status');
       const timestampEl = document.getElementById('timestamp');
       statusEl.textContent = 'Checking...';
       statusEl.className = 'status';
-      try {
-        const response = await fetch("https://milconnect.dmdc.osd.mil/", { mode: 'no-cors' });
-        // In 'no-cors' mode, the fetch succeeds but you can't inspect content — treat as UP.
-        statusEl.textContent = 'DEERS site appears to be UP ✅';
-        statusEl.classList.add('up');
-      } catch (e) {
-        statusEl.textContent = 'DEERS site appears to be DOWN ❌';
-        statusEl.classList.add('down');
-      }
+
+      const urls = [
+        'https://milconnect.dmdc.osd.mil/milconnect/',
+        'https://www.dmdc.osd.mil/self_service/',
+        'https://milconnect.dmdc.osd.mil/'
+      ];
+
+      const results = await checkMultipleUrls(urls);
+      const overall = interpretStatus(results);
+
+      statusEl.textContent = `DEERS site is ${overall.status}`;
+      statusEl.classList.add(overall.class);
+
       const now = new Date();
       timestampEl.textContent = `Last checked: ${now.toLocaleTimeString()} on ${now.toDateString()}`;
     }
 
-    // Initial check
     checkStatus();
   </script>
 </body>
